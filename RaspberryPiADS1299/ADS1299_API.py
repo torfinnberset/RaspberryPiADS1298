@@ -264,6 +264,7 @@ class ADS1298_API:
         self.stream_active = True
 
         # start the stream
+        self.setStart(True)
         self.SPI_transmitByte(RDATAC)
 
     """ PUBLIC
@@ -312,7 +313,7 @@ class ADS1298_API:
 
     def configure(self, nb_channels=None, sampling_rate=None, bias_enabled=None):
 
-        self.stopStream()
+        assert not self.stream_active
 
         if nb_channels is not None:
             self.nb_channels = nb_channels
@@ -430,17 +431,17 @@ class ADS1298_API:
 
     def setSamplingRate(self):
 
-        temp_reg_value = 0x90  # base value
+        temp_reg_value = 0x80  # base value
 
         # chip in sampling rate
         if self.sampling_rate == 2000:
-            temp_reg_value |= 0x03
+            temp_reg_value |= 0b100
         elif self.sampling_rate == 1000:
-            temp_reg_value |= 0x04
+            temp_reg_value |= 0b101
         elif self.sampling_rate == 500:
-            temp_reg_value |= 0x05
+            temp_reg_value |= 0b110
         else:
-            temp_reg_value |= 0x06
+            raise Exception("Invalid sample rate")
 
         self.SPI_writeSingleReg(REG_CONFIG1, temp_reg_value)
 
@@ -641,13 +642,13 @@ def _test():
 
     # init ads api
     ads = ADS1298_API()
-    print("You go into _test_")
+    
     # init device
     ads.openDevice()
     # attach default callback
     ads.registerClient(DefaultCallback)
     # configure ads
-    ads.configure(sampling_rate=1000)
+    ads.configure(sampling_rate=2000)
 
     print("ADS1298 API test stream starting")
 
