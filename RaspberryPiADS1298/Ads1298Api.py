@@ -30,7 +30,7 @@
                         - bias_enabled, used to enable/disable Bias drive {True,False}, default True
                     Note: changing any option will interrupt any active stream
                     Note: 2000Hz sampling rate is unstable, it requires the 24 bits conversion to be done in a different thread
-                    Note: gain is set to 24 and is not configurable, should you add this functionality, make sure to
+                    Note: gain is set to 12 and is not configurable
                 
                 - registerClient, add a callback to use for data
                 
@@ -80,13 +80,12 @@ except ImportError:
 STUB_GPIO = False
 try:
     import RPi.GPIO as GPIO
-except:
+except ImportError:
     STUB_GPIO = True
 
-# eeg data scaling function
-# adjusted from (5/Gain)/2^24, where gain is 24
-# note: datasheet says 4.5 instead of 5, but this value was determined experimentally
-SCALE_TO_UVOLT = 0.0000000121
+# exg data scaling function
+# adjusted from (5/Gain)/2^bits, where gain is 24
+SCALE_TO_UVOLT = (4.5 / 12) / 2**24
 
 """
 # conv24bitsToFloat(unpacked)
@@ -98,7 +97,7 @@ SCALE_TO_UVOLT = 0.0000000121
 """
 
 
-def convert_24b_to_float(unpacked):
+def convert_24b_to_int(unpacked):
     """Convert 24bit data coded on 3 bytes to a proper integer"""
     if len(unpacked) != 3:
         raise ValueError("Input should be 3 bytes long.")
@@ -115,10 +114,11 @@ def convert_24b_to_float(unpacked):
     literal_read = pre_fix + literal_read
 
     # unpack little endian(>) signed integer(i) (makes unpacking platform independent)
-    my_int = struct.unpack(">i", literal_read)[0]
+    return struct.unpack(">i", literal_read)[0]
 
-    # convert to uVolt
-    return my_int * SCALE_TO_UVOLT
+
+def convert_24b_to_float(unpacked):
+    return convert_24b_to_int(unpacked) * SCALE_TO_UVOLT
 
 
 """
@@ -494,12 +494,15 @@ class Ads1298Api:
             return
 
         # read 24 + n*24 bits or 3+n*3 bytes
-        bit_values = self.spi_read_multiple_bytes(3 + self.nb_channels * 3)
+        readback = self.spi_read_multiple_bytes(3 + self.nb_channels * 3)
+
+        status_word = convert_24b_to_int(readback[0:3])
+        assert status_word & 0xF00000 == 0xC00000, "Data steam lost synchronization"
 
         data_array = np.zeros(self.nb_channels)
         for i in range(0, self.nb_channels):
             data_array[i] = convert_24b_to_float(
-                bit_values[(i * 3 + 3) : ((i + 1) * 3 + 3)]
+                readback[(i * 3 + 3) : ((i + 1) * 3 + 3)]
             )
 
         # broadcast results
@@ -627,7 +630,7 @@ class Ads1298Api:
             self.spi_lock.release()
             return r[2]
         else:
-            return 0x92
+            return 0x92  # expected REG_ID content
 
 
 def _test():
