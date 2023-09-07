@@ -110,12 +110,12 @@ def conv24bitsToFloat(unpacked):
     literal_read = struct.pack('3B', unpacked[0], unpacked[1], unpacked[2])
 
     # 3byte int in 2s compliment
-    if (unpacked[0] > 127):
+    if unpacked[0] > 127:
         pre_fix = bytes(bytearray.fromhex('FF'))
     else:
         pre_fix = bytes(bytearray.fromhex('00'))
 
-    literal_read = pre_fix + literal_read;
+    literal_read = pre_fix + literal_read
 
     # unpack little endian(>) signed integer(i) (makes unpacking platform independent)
     myInt = struct.unpack('>i', literal_read)[0]
@@ -352,8 +352,8 @@ class ADS1298_API:
         # send SDATAC
         self.resetOngoingState()
 
-        self.setStart(True)
-        self.SPI_transmitByte(RDATAC)
+        # Check type of ADS
+        self.checkDeviceId()
 
     """ PRIVATE
     # setupEEGMode
@@ -482,6 +482,12 @@ class ADS1298_API:
                 for handle in self.clientUpdateHandles:
                     handle(np.random.rand(self.nb_channels))
             sleep(1.0 / float(self.sampling_rate))
+
+    def checkDeviceId(self):
+        res = self.SPI_readReg(REG_ID)
+        assert res & 0x18 == 0x10, "Reserved bytes don't match"
+        assert res & 0xE0 == 0x80, "Not ADS129x device family"
+        assert res & 0x03 == 0x02, "Not ADS1298 device"
 
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #   GPIO Interface
@@ -633,6 +639,15 @@ class ADS1298_API:
                 r[i]
 
         return r
+
+    def SPI_readReg(self, reg):
+        if not STUB_SPI:
+            self.spi_lock.acquire()
+            r = self.spi.xfer2([0x20 | reg, 0x00, 0x00])
+            self.spi_lock.release()
+            return r[2]
+        else:
+            return 0x92
 
 
 def _test():
