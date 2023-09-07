@@ -9,14 +9,6 @@
 
 ## Install
 
-### Using PyPI
-
-```
-pip install RaspberryPiADS1298
-```
-
-Anaconda is not currently supported, if you want to use anaconda, you need to create a virtual environment in anaconda, activate it and use the above command to install it.
-
 ### From sources
 
 For the latest version, you can install the package from the sources using the setup.py script
@@ -35,17 +27,16 @@ python setup.py develop
 
 The Raspberry Pi 4b is used as a reference
 
-Signal  |  RPi GPIO |  ADS Pin
---------------------------------
-MOSI    |     20    |    DIN
-MISO    |     19    |    DOUT
-SCLK    |     21    |    SCLK
-CS      |     24    |    CS
---------------------------------
-START   |     22    |    START
-RESET   |     24    |    nRESET
-PWRDN   |     25    |    nPWRDN
-DRDY    |     23    |    DRDY
+| Signal | RPi GPIO | ADS Pin |
+|--------|:--------:|--------:|
+| MOSI   |    20    |     DIN |
+| MISO   |    19    |    DOUT |
+| SCLK   |    21    |    SCLK |
+| CS     |    24    |      CS |
+| START  |    22    |   START |
+| RESET  |    24    |  nRESET |
+| PWRDN  |    25    |  nPWRDN |
+| DRDY   |    23    |    DRDY |
 
 ### Hardware Setup for EEG
 
