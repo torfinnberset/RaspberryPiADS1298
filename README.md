@@ -1,10 +1,10 @@
-# Raspberry Pi ADS1299 Driver
+# Raspberry Pi ADS1298 Driver
 
 <p align="center">
   <img alt="banner" src="/images/banner.jpg/" width="600">
 </p>
 <p align="center" href="">
-  A High Level Driver for ADS1299 Control with Raspberry Pi
+  A High Level Driver for ADS1298 Control with Raspberry Pi
 </p>
 
 ## Install
@@ -12,7 +12,7 @@
 ### Using PyPI
 
 ```
-pip install RaspberryPiADS1299
+pip install RaspberryPiADS1298
 ```
 
 Anaconda is not currently supported, if you want to use anaconda, you need to create a virtual environment in anaconda, activate it and use the above command to install it.
@@ -33,18 +33,19 @@ python setup.py develop
 
 ## Hardware Configuration
 
-The Raspberry Pi 3 is used as a reference
+The Raspberry Pi 4b is used as a reference
 
-|Signal  |  RPi Pin  |  ADS Pin|
-|--------|:---------:|----------:|
-|MOSI    |     19    |    DIN|
-|MISO    |     21    |    DOUT|
-|SCLK    |     23    |    SCLK|
-|CS      |     24    |    CS|
-|START   |     15    |    START|
-|RESET   |     16    |    nRESET|
-|PWRDN   |     18    |    nPWRDN|
-|DRDY    |     22    |    DRDY|
+Signal  |  RPi GPIO |  ADS Pin
+--------------------------------
+MOSI    |     20    |    DIN
+MISO    |     19    |    DOUT
+SCLK    |     21    |    SCLK
+CS      |     24    |    CS
+--------------------------------
+START   |     22    |    START
+RESET   |     24    |    nRESET
+PWRDN   |     25    |    nPWRDN
+DRDY    |     23    |    DRDY
 
 ### Hardware Setup for EEG
 
@@ -55,11 +56,11 @@ Connect sensing electrode to P (+) and ref to SRB1. With default config, the API
 It is easy as :
 
 ```python
-from RaspberryPiADS1299 import ADS1299_API
+from RaspberryPiADS1298 import ADS1298_API
 from time import time, sleep
 
 # init ads api
-ads = ADS1299_API()
+ads = ADS1298_API()
 
 # init device
 ads.openDevice()
@@ -68,7 +69,7 @@ ads.registerClient(DefaultCallback)
 # configure ads
 ads.configure(sampling_rate=1000)
 
-print "ADS1299 API test stream starting"
+print("ADS1298 API test stream starting")
 
 # begin test streaming
 ads.startTestStream()
@@ -79,7 +80,7 @@ ads.startTestStream()
 # wait
 sleep(10)
 
-print "ADS1299 API test stream stopping"
+print("ADS1298 API test stream stopping")
 
 # stop device
 ads.stopStream()
@@ -87,7 +88,7 @@ ads.stopStream()
 ads.closeDevice()
 
 sleep(1)
-print "Test Over"
+print("Test Over")
 
 ```
 
@@ -95,7 +96,5 @@ print "Test Over"
 ## Credits
 
 ### Author
-Fred Simard
-
-### Maintainer
-AJ Keller (@aj-ptw)
+Fred Simard (ADS1299 driver)
+Torfinn Berset (ADS1298 driver)

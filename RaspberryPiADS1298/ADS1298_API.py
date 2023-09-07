@@ -405,13 +405,13 @@ class ADS1298_API:
         self.SPI_transmitByte(SDATAC)
 
         # setup CONFIG3 register
-        self.SPI_writeSingleReg(REG_CONFIG3, 0xE0)
+        # self.SPI_writeSingleReg(REG_CONFIG3, 0xE0) # Enable reference buffer, set VREFP to 4V
 
         # setup CONFIG1 register
         self.setSamplingRate()
 
         # setup CONFIG2 register
-        self.SPI_writeSingleReg(REG_CONFIG2, 0xC0)
+        self.SPI_writeSingleReg(REG_CONFIG2, 0xC0) 
 
         # disable any bias
         self.SPI_writeSingleReg(REG_BIAS_SENSP, 0x00)
@@ -655,7 +655,7 @@ def _test():
     ads.startEegStream()
 
     # wait
-    sleep(10)
+    sleep(1)
 
     print("ADS1298 API test stream stopping")
 
