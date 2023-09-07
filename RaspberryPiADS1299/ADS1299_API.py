@@ -355,20 +355,16 @@ class ADS1298_API:
     """
 
     def setupEEGMode(self):
+        print("Setting up EXG mode")
 
-        # Write CHnSET 05h (connects test signal)
         # (0) normal operation
-        # (110) PGA gain 24
+        # (110) PGA gain 12 
         # (0) SRB2 open
         # (000) Normal operations
         tx_buf = [0] * self.nb_channels
-        for i in xrange(0, self.nb_channels):
-            tx_buf[i] = 0x60;
-        self.SPI_writeMultipleReg(REG_CHnSET_BASE, tx_buf);
-
-        # set the MUX for SRB1 to be connected to all N pins
-        # MISC register (multiple single-ended electrodes)
-        self.SPI_writeSingleReg(REG_MISC, 0x20);
+        for i in range(0, self.nb_channels):
+            tx_buf[i] = 0x60
+        self.SPI_writeMultipleReg(REG_CHnSET_BASE, tx_buf)
 
         # setup bias
         if self.bias_enabled:
@@ -394,8 +390,8 @@ class ADS1298_API:
 
         # Write CHnSET 05h (connects test signal)
         tx_buf = [0] * self.nb_channels
-        for i in xrange(0, self.nb_channels):
-            tx_buf[i] = 0x65
+        for i in range(0, self.nb_channels):
+            tx_buf[i] = 0x05
         self.SPI_writeMultipleReg(REG_CHnSET_BASE, tx_buf)
 
     """ PRIVATE
