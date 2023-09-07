@@ -132,8 +132,7 @@ DefaultCallback
 
 
 def DefaultCallback(data):
-    pass
-    #print repr(data)
+    print(repr(data))
 
 
 """ ADS1298 PINS """
@@ -143,11 +142,11 @@ nPWRDN_PIN = 25
 DRDY_PIN = 23
 
 """ ADS1298 registers map """
+REG_ID = 0x00
 REG_CONFIG1 = 0x01
 REG_CONFIG2 = 0x02
 REG_CONFIG3 = 0x03
 REG_CHnSET_BASE = 0x05
-REG_MISC = 0x15
 REG_BIAS_SENSP = 0x0D
 REG_BIAS_SENSN = 0x0E
 
@@ -198,7 +197,7 @@ class ADS1298_API:
     """
 
     def __init__(self):
-        if STUB_SPI == False:
+        if STUB_SPI is False:
             self.spi = spidev.SpiDev()
 
     """ PUBLIC
@@ -207,8 +206,7 @@ class ADS1298_API:
     """
 
     def openDevice(self):
-
-        if STUB_SPI == False and STUB_GPIO == False:
+        if STUB_SPI is False and STUB_GPIO is False:
 
             # open and configure SPI port
             self.spi.open(0, 0)
@@ -228,9 +226,8 @@ class ADS1298_API:
             GPIO.add_event_detect(DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
 
         else:
-
             # setup fake data generator
-            print "stubbed mode"
+            print("stubbed mode")
             APIAlive = True
             self.stubThread = Thread(target=self.stubTask)
             self.stubThread.start()
@@ -247,12 +244,11 @@ class ADS1298_API:
     """
 
     def closeDevice(self):
-        if STUB_SPI == False and STUB_GPIO == False:
+        if STUB_SPI is False and STUB_GPIO is False:
             self.spi.close()
             GPIO.cleanup()
 
         self.APIAlive = False
-        return
 
     """ PUBLIC
     # startEegStream
@@ -260,8 +256,7 @@ class ADS1298_API:
     """
 
     def startEegStream(self):
-
-        # stop any on-going stream
+        # stop any ongoing stream
         self.resetOngoingState()
 
         # setup EEG mode
@@ -277,8 +272,7 @@ class ADS1298_API:
     """
 
     def startTestStream(self):
-
-        # stop any on-going stream
+        # stop any ongoing stream
         self.resetOngoingState()
 
         # setup test mode
@@ -294,7 +288,7 @@ class ADS1298_API:
     """
 
     def stopStream(self):
-        # stop any on-going ads stream
+        # stop any ongoing ADS stream
         self.SPI_transmitByte(SDATAC)
         self.stream_active = False
 
@@ -386,8 +380,8 @@ class ADS1298_API:
     """
 
     def setupTestMode(self):
-
-        # stop any on-going ads stream
+        print("Setting up Test Mode")
+        # stop any ongoing ads stream
         self.SPI_transmitByte(SDATAC)
 
         # Write CONFIG2 D0h
@@ -428,7 +422,7 @@ class ADS1298_API:
 
         # setup CHnSET registers
         tx_buf = [0] * MAX_NB_CHANNELS
-        for i in xrange(0, MAX_NB_CHANNELS):
+        for i in range(0, MAX_NB_CHANNELS):
             # input shorted
             tx_buf[i] = 0x01
         self.SPI_writeMultipleReg(REG_CHnSET_BASE, tx_buf)
@@ -463,9 +457,9 @@ class ADS1298_API:
     def setupBiasDrive(self):
 
         if self.bias_enabled:
-
+            print("Configuring bias registers") 
             temp_reg_value = 0x00
-            for i in xrange(0, self.nb_channels):
+            for i in range(0, self.nb_channels):
                 temp_reg_value |= 0x01 << i
             self.SPI_writeSingleReg(REG_BIAS_SENSP, temp_reg_value)
             self.SPI_writeSingleReg(REG_BIAS_SENSN, temp_reg_value)
@@ -496,7 +490,7 @@ class ADS1298_API:
     """ PRIVATE
     # drdy_callback
     # @brief callback triggered on DRDY falling edge. When this happens, if the stream
-             is active, will get all the sample from the ADS1299 and update all
+             is active, will get all the sample from the ADS1298 and update all
              clients
     # @param state, state of the pin to read (not used)
     """
@@ -526,7 +520,7 @@ class ADS1298_API:
     """
 
     def setStart(self, state):
-        if STUB_GPIO == False:
+        if not STUB_GPIO:
             if state:
                 GPIO.output(START_PIN, GPIO.HIGH)
             else:
@@ -551,7 +545,7 @@ class ADS1298_API:
     """
 
     def setnReset(self, state):
-        if STUB_GPIO == False:
+        if not STUB_GPIO:
             if state:
                 GPIO.output(nRESET_PIN, GPIO.HIGH)
             else:
@@ -564,7 +558,7 @@ class ADS1298_API:
     """
 
     def setnPWRDN(self, state):
-        if STUB_GPIO == False:
+        if not STUB_GPIO:
             if state:
                 GPIO.output(nPWRDN_PIN, GPIO.HIGH)
             else:
@@ -581,8 +575,7 @@ class ADS1298_API:
     """
 
     def SPI_transmitByte(self, byte):
-
-        if STUB_SPI == False:
+        if not STUB_SPI:
             self.spi_lock.acquire()
             self.spi.xfer2([byte])
             self.spi_lock.release()
@@ -595,8 +588,7 @@ class ADS1298_API:
     """
 
     def SPI_writeSingleReg(self, reg, byte):
-
-        if STUB_SPI == False:
+        if not STUB_SPI:
             self.spi_lock.acquire()
             self.spi.xfer2([reg | 0x40, 0x00, byte])
             self.spi_lock.release()
@@ -611,11 +603,9 @@ class ADS1298_API:
     """
 
     def SPI_writeMultipleReg(self, start_reg, byte_array):
-
-        if STUB_SPI == False:
-            tmp = [start_reg | 0x40]
-            tmp.append(len(byte_array) - 1)
-            for i in xrange(0, len(byte_array)):
+        if not STUB_SPI:
+            tmp = [start_reg | 0x40, len(byte_array) - 1]
+            for i in range(0, len(byte_array)):
                 tmp.append(byte_array[i])
             self.spi_lock.acquire()
             self.spi.xfer2(tmp)
@@ -631,11 +621,11 @@ class ADS1298_API:
 
         r = []
 
-        if STUB_SPI == False:
+        if not STUB_SPI:
             self.spi_lock.acquire()
             r = self.spi.xfer2([0x00] * nb_bytes)
             self.spi_lock.release()
-            for i in xrange(0, nb_bytes):
+            for i in range(0, nb_bytes):
                 r[i]
 
         return r
@@ -679,8 +669,13 @@ def _test():
     ads.closeDevice()
 
     sleep(1)
-    print "Test Over"
+    print("Test Over")
 
 
 if __name__ == "__main__":
-    _test()
+    try:
+        _test()
+    except Exception as e:
+        print(e)
+        GPIO.cleanup()
+
