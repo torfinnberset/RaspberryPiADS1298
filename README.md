@@ -56,26 +56,26 @@ Connect sensing electrode to P (+) and ref to SRB1. With default config, the API
 It is easy as :
 
 ```python
-from RaspberryPiADS1298 import ADS1298_API
+from RaspberryPiADS1298 import Ads1298Api
 from time import time, sleep
 
 # init ads api
-ads = ADS1298_API()
+ads = Ads1298Api()
 
 # init device
-ads.openDevice()
+ads.open_device()
 # attach default callback
-ads.registerClient(DefaultCallback)
+ads.register_client(DefaultCallback)
 # configure ads
 ads.configure(sampling_rate=1000)
 
 print("ADS1298 API test stream starting")
 
 # begin test streaming
-ads.startTestStream()
+ads.start_test_stream()
 
-# begin EEG streaming
-# ads.startEegStream()
+# begin ExG streaming
+# ads.startExgStream()
 
 # wait
 sleep(10)
@@ -83,9 +83,9 @@ sleep(10)
 print("ADS1298 API test stream stopping")
 
 # stop device
-ads.stopStream()
+ads.stop_stream()
 # clean up
-ads.closeDevice()
+ads.close_device()
 
 sleep(1)
 print("Test Over")
