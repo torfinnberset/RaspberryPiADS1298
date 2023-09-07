@@ -65,11 +65,8 @@
 """
 
 import struct
-from threading import Semaphore, Lock, Thread
-from time import time, sleep
-import random
-import platform
-import sys
+from threading import Lock, Thread
+from time import sleep
 
 import numpy as np
 
@@ -297,8 +294,8 @@ class Ads1298Api:
     # @param clientHandle, update handle of the client
     """
 
-    def register_client(self, clientHandle):
-        self.clientUpdateHandles.append(clientHandle)
+    def register_client(self, client_handle):
+        self.clientUpdateHandles.append(client_handle)
 
     """ PUBLIC
     # configure
