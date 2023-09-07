@@ -493,17 +493,16 @@ class ADS1298_API:
     """
 
     def drdy_callback(self, state):
-
         # on event, read the data from ADS
+
+        if not self.stream_active:
+            return
+        
         # read 24 + n*24 bits or 3+n*3 bytes
         bit_values = self.SPI_readMultipleBytes(3 + self.nb_channels * 3)
 
-        # skip is no stream active
-        if self.stream_active == False:
-            return
-
         data_array = np.zeros(self.nb_channels)
-        for i in xrange(0, self.nb_channels):
+        for i in range(0, self.nb_channels):
             data_array[i] = conv24bitsToFloat(bit_values[(i * 3 + 3):((i + 1) * 3 + 3)])
 
         # broadcast results
