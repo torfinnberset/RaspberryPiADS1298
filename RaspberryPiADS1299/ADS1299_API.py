@@ -209,9 +209,9 @@ class ADS1298_API:
         if STUB_SPI is False and STUB_GPIO is False:
 
             # open and configure SPI port
-            self.spi.open(0, 0)
-            self.spi.max_speed_hz = 4000000
-            self.spi.mode = 0b01
+            self.spi.open(0, 1)
+            self.spi.max_speed_hz = 500000
+            self.spi.mode = 0b01 # SPI settings are CPOL = 0 and CPHA = 1.
 
             # using BCM pin numbering scheme
             GPIO.setmode(GPIO.BCM)
