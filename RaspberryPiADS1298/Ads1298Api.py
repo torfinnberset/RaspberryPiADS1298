@@ -161,8 +161,6 @@ RDATAC = 0x10
 SDATAC = 0x11
 RDATA = 0x12
 
-MAX_NB_CHANNELS = 8
-
 """
 # Ads1298Api
 # @brief Encapsulated API, provides basic functionalities
@@ -354,13 +352,7 @@ class Ads1298Api:
         print("Setting up ExG mode")
 
         self.spi_write_single_reg(REG_CONFIG2, 0x00)
-
-        tx_buf = [0] * NUM_CHANNELS
-
-        for i in range(0, NUM_CHANNELS):
-            tx_buf[i] = 0x60
-
-        self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
+        self.configure_all_channels(0x60)
 
         self.spi_write_single_reg(REG_BIAS_SENSP, 0xFF)
         self.spi_write_single_reg(REG_BIAS_SENSN, 0x01)
@@ -397,10 +389,7 @@ class Ads1298Api:
         self.configure_dc_leads_off(False)
 
         # Write CHnSET 05h (connects test signal)
-        tx_buf = [0] * NUM_CHANNELS
-        for i in range(0, NUM_CHANNELS):
-            tx_buf[i] = 0x05
-        self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
+        self.configure_all_channels(0x05)
 
     """ PRIVATE
     # resetOngoingState
@@ -424,12 +413,8 @@ class Ads1298Api:
         self.spi_write_single_reg(REG_BIAS_SENSP, 0x00)
         self.spi_write_single_reg(REG_BIAS_SENSN, 0x00)
 
-        # setup CHnSET registers
-        tx_buf = [0] * MAX_NB_CHANNELS
-        for i in range(0, MAX_NB_CHANNELS):
-            # input shorted
-            tx_buf[i] = 0x01
-        self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
+        # input shorted
+        self.configure_all_channels(0x01)
 
     """ PRIVATE
     # setSamplingRate
@@ -437,7 +422,6 @@ class Ads1298Api:
     """
 
     def set_sampling_rate(self):
-
         temp_reg_value = 0x80  # base value
 
         # chip in sampling rate
@@ -528,11 +512,7 @@ class Ads1298Api:
     """
 
     def set_start(self, state):
-        if not STUB_GPIO:
-            if state:
-                GPIO.output(START_PIN, GPIO.HIGH)
-            else:
-                GPIO.output(START_PIN, GPIO.LOW)
+        self.set_pin(START_PIN, state)
 
     """ PRIVATE
     # toggleReset
@@ -553,11 +533,7 @@ class Ads1298Api:
     """
 
     def set_nreset(self, state):
-        if not STUB_GPIO:
-            if state:
-                GPIO.output(nRESET_PIN, GPIO.HIGH)
-            else:
-                GPIO.output(nRESET_PIN, GPIO.LOW)
+        self.set_pin(nRESET_PIN, state)
 
     """ PRIVATE
     # setnPWRDN
@@ -565,12 +541,21 @@ class Ads1298Api:
     # @param state, state of the pin to set
     """
 
-    def set_npwrdn(self, state):
+    def set_npwrdn(self, state: bool):
+        self.set_pin(nPWRDN_PIN, state)
+
+    def configure_all_channels(self, config: int):
+        tx_buf = [0] * NUM_CHANNELS
+        for i in range(0, NUM_CHANNELS):
+            tx_buf[i] = config
+        self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
+
+    def set_pin(self, pin: int, state: bool):
         if not STUB_GPIO:
             if state:
-                GPIO.output(nPWRDN_PIN, GPIO.HIGH)
+                GPIO.output(pin, GPIO.HIGH)
             else:
-                GPIO.output(nPWRDN_PIN, GPIO.LOW)
+                GPIO.output(pin, GPIO.LOW)
 
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #   SPI Interface
@@ -645,7 +630,7 @@ class Ads1298Api:
             return 0x92  # expected REG_ID content
 
 
-def _test():
+def _test(use_test_signal=False):
     print("Starting validation sequence")
 
     # init ads api
@@ -656,12 +641,12 @@ def _test():
     # attach default callback
     ads.register_client(default_callback)
     # configure ads
-    ads.configure(sampling_rate=2000)
+    ads.configure(sampling_rate=500)
 
     print("ADS1298 API test stream starting")
 
     # begin test streaming
-    ads.start_exg_stream()
+    ads.start_test_stream() if use_test_signal else ads.start_exg_stream()
 
     # wait
     sleep(1)
@@ -679,7 +664,7 @@ def _test():
 
 if __name__ == "__main__":
     try:
-        _test()
+        _test(True)
     except Exception as e:
         print(e)
         GPIO.cleanup()
