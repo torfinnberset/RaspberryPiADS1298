@@ -70,18 +70,13 @@ from time import sleep
 
 import numpy as np
 
-STUB_SPI = False
+STUB_API = False
 try:
     import spidev
-except ImportError:
-    STUB_SPI = True
-    pass
-
-STUB_GPIO = False
-try:
     import RPi.GPIO as GPIO
 except ImportError:
-    STUB_GPIO = True
+    STUB_API = True
+    pass
 
 # exg data scaling function
 SCALE_TO_UVOLT = (5 / 12) / (2 ** 24)  # TODO: verify
@@ -196,7 +191,7 @@ class Ads1298Api:
     """
 
     def __init__(self):
-        if STUB_SPI is False:
+        if not STUB_API:
             self.spi = spidev.SpiDev()
 
     """ PUBLIC
@@ -205,7 +200,7 @@ class Ads1298Api:
     """
 
     def open_device(self):
-        if STUB_SPI is False and STUB_GPIO is False:
+        if not STUB_API:
             # open and configure SPI port
             self.spi.open(0, 1)
             self.spi.max_speed_hz = 500000
@@ -241,7 +236,7 @@ class Ads1298Api:
     """
 
     def close_device(self):
-        if STUB_SPI is False and STUB_GPIO is False:
+        if not STUB_API:
             self.spi.close()
             GPIO.cleanup()
 
@@ -551,7 +546,7 @@ class Ads1298Api:
         self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
 
     def set_pin(self, pin: int, state: bool):
-        if not STUB_GPIO:
+        if not STUB_API:
             if state:
                 GPIO.output(pin, GPIO.HIGH)
             else:
@@ -568,7 +563,7 @@ class Ads1298Api:
     """
 
     def spi_transmit_byte(self, byte):
-        if not STUB_SPI:
+        if not STUB_API:
             self.spi_lock.acquire()
             self.spi.xfer2([byte])
             self.spi_lock.release()
@@ -581,7 +576,7 @@ class Ads1298Api:
     """
 
     def spi_write_single_reg(self, reg, byte):
-        if not STUB_SPI:
+        if not STUB_API:
             self.spi_lock.acquire()
             self.spi.xfer2([reg | 0x40, 0x00, byte])
             self.spi_lock.release()
@@ -596,7 +591,7 @@ class Ads1298Api:
     """
 
     def spi_write_multiple_reg(self, start_reg: int, byte_array: list[int]):
-        if not STUB_SPI:
+        if not STUB_API:
             tmp = [start_reg | 0x40, len(byte_array) - 1]
             for i in range(0, len(byte_array)):
                 tmp.append(byte_array[i])
@@ -613,7 +608,7 @@ class Ads1298Api:
     def spi_read_multiple_bytes(self, nb_bytes):
         r = []
 
-        if not STUB_SPI:
+        if not STUB_API:
             self.spi_lock.acquire()
             r = self.spi.xfer2([0x00] * nb_bytes)
             self.spi_lock.release()
@@ -621,7 +616,7 @@ class Ads1298Api:
         return r
 
     def spi_read_reg(self, reg):
-        if not STUB_SPI:
+        if not STUB_API:
             self.spi_lock.acquire()
             r = self.spi.xfer2([0x20 | reg, 0x00, 0x00])
             self.spi_lock.release()
