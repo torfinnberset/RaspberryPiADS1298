@@ -92,7 +92,7 @@ NUM_CHANNELS = 8
 """
 
 
-def convert_24b_to_int(unpacked):
+def convert_24b_data(unpacked, fmt=">i"):
     """Convert 24bit data coded on 3 bytes to a proper integer"""
     if len(unpacked) != 3:
         raise ValueError("Input should be 3 bytes long.")
@@ -108,11 +108,11 @@ def convert_24b_to_int(unpacked):
     literal_read = prefix + literal_read
 
     # unpack little endian(>) signed integer(i) (makes unpacking platform independent)
-    return struct.unpack(">i", literal_read)[0]
+    return struct.unpack(fmt, literal_read)[0]
 
 
 def convert_24b_to_float(unpacked):
-    return convert_24b_to_int(unpacked) * SCALE_TO_UVOLT
+    return convert_24b_data(unpacked) * SCALE_TO_UVOLT
 
 
 """
@@ -122,8 +122,15 @@ DefaultCallback
 """
 
 
-def default_callback(data):
-    print(repr(data))
+def default_callback(raw):
+    samples = np.zeros(NUM_CHANNELS)
+    status_word = convert_24b_data(raw[0:3], ">I") & 0xffffff
+
+    for i in range(0, NUM_CHANNELS):
+        samples[i] = convert_24b_to_float(raw[(i * 3 + 3): ((i + 1) * 3 + 3)])
+
+    print(status_word)
+    print(samples)
 
 
 """ ADS1298 PINS """
@@ -488,13 +495,6 @@ class Ads1298Api:
 
         # read 24 + n*24 bits or 3+n*3 bytes
         raw = self.spi_read_multiple_bytes(3 + NUM_CHANNELS * 3)
-        samples = np.zeros(self.nb_channels)
-        status_word = convert_24b_to_int(raw[0:3])
-
-        print(f"status: {status_word}")
-
-        for i in range(0, NUM_CHANNELS):
-            samples[i] = convert_24b_to_float(raw[(i * 3 + 3): ((i + 1) * 3 + 3)])
 
         # broadcast raw
         for handle in self.clientUpdateHandles:
