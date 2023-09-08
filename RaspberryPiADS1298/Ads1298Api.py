@@ -142,9 +142,14 @@ REG_ID = 0x00
 REG_CONFIG1 = 0x01
 REG_CONFIG2 = 0x02
 REG_CONFIG3 = 0x03
+REG_CONFIG4 = 0x17
+REG_LOFF = 0x04
 REG_CHnSET_BASE = 0x05
 REG_BIAS_SENSP = 0x0D
 REG_BIAS_SENSN = 0x0E
+REG_LOFF_SENSP = 0x0F
+REG_LOFF_SENSN = 0x10
+REG_LOFF_FLIP = 0x11
 
 """ ADS1298 Commands """
 WAKEUP = 0x02
@@ -275,6 +280,7 @@ class Ads1298Api:
 
         # start the stream
         self.stream_active = True
+        self.set_start(True)
         self.spi_transmit_byte(RDATAC)
 
     """ PUBLIC
@@ -347,18 +353,34 @@ class Ads1298Api:
     def setup_exg_mode(self):
         print("Setting up ExG mode")
 
-        # (0) normal operation
-        # (110) PGA gain 12
-        # (0) SRB2 open
-        # (000) Normal operations
-        tx_buf = [0] * self.nb_channels
-        for i in range(0, self.nb_channels):
+        self.spi_write_single_reg(REG_CONFIG2, 0x00)
+
+        tx_buf = [0] * NUM_CHANNELS
+
+        for i in range(0, NUM_CHANNELS):
             tx_buf[i] = 0x60
+
         self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
 
-        # setup bias
-        if self.bias_enabled:
-            self.setup_bias_drive()
+        self.spi_write_single_reg(REG_BIAS_SENSP, 0xFF)
+        self.spi_write_single_reg(REG_BIAS_SENSN, 0x01)
+
+        self.configure_dc_leads_off(True)
+        self.setup_bias_drive()
+
+    def configure_dc_leads_off(self, enable: bool):
+        if enable:
+            self.spi_write_single_reg(REG_LOFF, 0x93)
+            self.spi_write_single_reg(REG_LOFF_SENSP, 0xFF)
+            self.spi_write_single_reg(REG_LOFF_SENSN, 0xFF)
+            self.spi_write_single_reg(REG_LOFF_FLIP, 0xFF)
+            self.spi_write_single_reg(REG_CONFIG4, 0x02)
+        else:
+            self.spi_write_single_reg(REG_LOFF, 0x00)
+            self.spi_write_single_reg(REG_LOFF_SENSP, 0x00)
+            self.spi_write_single_reg(REG_LOFF_SENSN, 0x00)
+            self.spi_write_single_reg(REG_LOFF_FLIP, 0x00)
+            self.spi_write_single_reg(REG_CONFIG4, 0x00)
 
     """ PRIVATE
     # setupTestMode
@@ -371,12 +393,8 @@ class Ads1298Api:
         self.spi_transmit_byte(SDATAC)
 
         # Write CONFIG2 D0h
-        # (110) reserved
-        # (1) test signal generated internally
-        # (0) reserved
-        # (0) signal amplitude: 1 x -(VREFP - VREFN) / 2400
-        # (00) test signal pulsed at fCLK / 2^21
-        self.spi_write_single_reg(REG_CONFIG2, 0xD0)
+        self.spi_write_single_reg(REG_CONFIG2, 0x11)
+        self.configure_dc_leads_off(False)
 
         # Write CHnSET 05h (connects test signal)
         tx_buf = [0] * NUM_CHANNELS
@@ -394,7 +412,7 @@ class Ads1298Api:
         self.spi_transmit_byte(SDATAC)
 
         # setup CONFIG3 register
-        # self.SPI_writeSingleReg(REG_CONFIG3, 0xE0) # Enable reference buffer, set VREFP to 4V
+        self.spi_write_single_reg(REG_CONFIG3, 0x48)
 
         # setup CONFIG1 register
         self.set_sampling_rate()
@@ -441,15 +459,16 @@ class Ads1298Api:
     """
 
     def setup_bias_drive(self):
+        if not self.bias_enabled:
+            return
 
-        if self.bias_enabled:
-            print("Configuring bias registers")
-            temp_reg_value = 0x00
-            for i in range(0, self.nb_channels):
-                temp_reg_value |= 0x01 << i
-            self.spi_write_single_reg(REG_BIAS_SENSP, temp_reg_value)
-            self.spi_write_single_reg(REG_BIAS_SENSN, temp_reg_value)
-            self.spi_write_single_reg(REG_CONFIG3, 0xEC)
+        print("Configuring bias registers")
+        temp_reg_value = 0x00
+        for i in range(0, NUM_CHANNELS):
+            temp_reg_value |= 0x01 << i
+        self.spi_write_single_reg(REG_BIAS_SENSP, temp_reg_value)
+        self.spi_write_single_reg(REG_BIAS_SENSN, temp_reg_value)
+        self.spi_write_single_reg(REG_CONFIG3, 0xEC)
 
     """ PRIVATE
     # stubTask
@@ -591,7 +610,7 @@ class Ads1298Api:
     # @param byte_array, array of bytes containing registers values
     """
 
-    def spi_write_multiple_reg(self, start_reg, byte_array):
+    def spi_write_multiple_reg(self, start_reg: int, byte_array: list[int]):
         if not STUB_SPI:
             tmp = [start_reg | 0x40, len(byte_array) - 1]
             for i in range(0, len(byte_array)):
