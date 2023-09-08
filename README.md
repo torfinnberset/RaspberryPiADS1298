@@ -48,7 +48,7 @@ It is easy as :
 
 ```python
 from RaspberryPiADS1298 import Ads1298Api
-from time import time, sleep
+from time import sleep
 
 # init ads api
 ads = Ads1298Api()

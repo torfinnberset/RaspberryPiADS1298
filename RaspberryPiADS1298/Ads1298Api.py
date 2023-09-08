@@ -84,8 +84,8 @@ except ImportError:
     STUB_GPIO = True
 
 # exg data scaling function
-# adjusted from (5/Gain)/2^bits, where gain is 24
-SCALE_TO_UVOLT = (4.5 / 12) / 2**24
+SCALE_TO_UVOLT = (5 / 12) / (2 ** 24)  # TODO: verify
+NUM_CHANNELS = 8
 
 """
 # conv24bitsToFloat(unpacked)
@@ -102,16 +102,15 @@ def convert_24b_to_int(unpacked):
     if len(unpacked) != 3:
         raise ValueError("Input should be 3 bytes long.")
 
-    # FIXME: quick'n dirty, unpack wants strings later on
     literal_read = struct.pack("3B", unpacked[0], unpacked[1], unpacked[2])
 
     # 3byte int in 2s compliment
     if unpacked[0] > 127:
-        pre_fix = bytes(bytearray.fromhex("FF"))
+        prefix = bytes(bytearray.fromhex("FF"))
     else:
-        pre_fix = bytes(bytearray.fromhex("00"))
+        prefix = bytes(bytearray.fromhex("00"))
 
-    literal_read = pre_fix + literal_read
+    literal_read = prefix + literal_read
 
     # unpack little endian(>) signed integer(i) (makes unpacking platform independent)
     return struct.unpack(">i", literal_read)[0]
@@ -167,7 +166,7 @@ MAX_NB_CHANNELS = 8
 
 
 class Ads1298Api:
-    # spi port
+    # spi device
     spi = None
 
     # thread processing inputs
@@ -256,9 +255,9 @@ class Ads1298Api:
 
         # setup ExG mode
         self.setup_exg_mode()
-        self.stream_active = True
 
         # start the stream
+        self.stream_active = True
         self.set_start(True)
         self.spi_transmit_byte(RDATAC)
 
@@ -301,17 +300,12 @@ class Ads1298Api:
     # configure
     # @brief provide the ADS1298 configuration interface, it uses optional parameters
     #        no parameter validation take place, make sure to provide valid value
-    #   - nb_channels {1-8}
     #   - sampling_rate {500, 1000, 2000}
     #   - bias_enabled {True, False}
     """
 
-    def configure(self, nb_channels=None, sampling_rate=None, bias_enabled=None):
-
+    def configure(self, sampling_rate=None, bias_enabled=None):
         assert not self.stream_active
-
-        if nb_channels is not None:
-            self.nb_channels = nb_channels
 
         if sampling_rate is not None:
             self.sampling_rate = sampling_rate
@@ -385,8 +379,8 @@ class Ads1298Api:
         self.spi_write_single_reg(REG_CONFIG2, 0xD0)
 
         # Write CHnSET 05h (connects test signal)
-        tx_buf = [0] * self.nb_channels
-        for i in range(0, self.nb_channels):
+        tx_buf = [0] * NUM_CHANNELS
+        for i in range(0, NUM_CHANNELS):
             tx_buf[i] = 0x05
         self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
 
@@ -436,7 +430,7 @@ class Ads1298Api:
         elif self.sampling_rate == 500:
             temp_reg_value |= 0b110
         else:
-            raise Exception("Invalid sample rate")
+            raise ValueError("Invalid sample rate")
 
         self.spi_write_single_reg(REG_CONFIG1, temp_reg_value)
 
@@ -465,8 +459,9 @@ class Ads1298Api:
     def stub_task(self):
         while self.APIAlive:
             if self.stream_active:
+                raw = np.random.bytes(3 + 3 * NUM_CHANNELS)
                 for handle in self.clientUpdateHandles:
-                    handle(np.random.rand(self.nb_channels))
+                    handle(raw)
             sleep(1.0 / float(self.sampling_rate))
 
     def check_device_id(self):
@@ -494,20 +489,18 @@ class Ads1298Api:
             return
 
         # read 24 + n*24 bits or 3+n*3 bytes
-        readback = self.spi_read_multiple_bytes(3 + self.nb_channels * 3)
+        raw = self.spi_read_multiple_bytes(3 + NUM_CHANNELS * 3)
+        samples = np.zeros(self.nb_channels)
+        status_word = convert_24b_to_int(raw[0:3])
 
-        status_word = convert_24b_to_int(readback[0:3])
-        assert status_word & 0xF00000 == 0xC00000, "Data steam lost synchronization"
+        print(f"status: {status_word}")
 
-        data_array = np.zeros(self.nb_channels)
-        for i in range(0, self.nb_channels):
-            data_array[i] = convert_24b_to_float(
-                readback[(i * 3 + 3) : ((i + 1) * 3 + 3)]
-            )
+        for i in range(0, NUM_CHANNELS):
+            samples[i] = convert_24b_to_float(raw[(i * 3 + 3): ((i + 1) * 3 + 3)])
 
-        # broadcast results
+        # broadcast raw
         for handle in self.clientUpdateHandles:
-            handle(data_array)
+            handle(raw)
 
     """ PRIVATE
     # setStart
