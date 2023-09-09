@@ -26,7 +26,7 @@
             Configuration:
                 - configure, is the public interface to change system configuration. It uses optional parameters
                         - nb_channels, sets the number of channels {1,8}, default 8
-                        - sampling_rate, sets the sampling rate {500,1000,2000*}, default 500
+                        - sampling_rate, sets the sampling rate {500,1000,2000, 4000}, default 500
                         - bias_enabled, used to enable/disable Bias drive {True,False}, default True
                     Note: changing any option will interrupt any active stream
                     Note: 2000Hz sampling rate is unstable, it requires the 24 bits conversion to be done in a different thread
@@ -186,7 +186,7 @@ class Ads1298Api:
 
     # device configuration
     nb_channels = 8  # {1-8}
-    sampling_rate = 500  # {500,1000,2000}
+    sampling_rate = 500  # {500,1000,2000,4000}
     bias_enabled = False  # {True, False}
 
     # True when a data stream is active
@@ -306,7 +306,7 @@ class Ads1298Api:
     # configure
     # @brief provide the ADS1298 configuration interface, it uses optional parameters
     #        no parameter validation take place, make sure to provide valid value
-    #   - sampling_rate {500, 1000, 2000}
+    #   - sampling_rate {500, 1000, 2000, 4000}
     #   - bias_enabled {True, False}
     """
 
@@ -427,6 +427,8 @@ class Ads1298Api:
         temp_reg_value = 0x80  # base value
 
         # chip in sampling rate
+        if self.sampling_rate == 4000:
+            temp_reg_value |= 0b011
         if self.sampling_rate == 2000:
             temp_reg_value |= 0b100
         elif self.sampling_rate == 1000:
