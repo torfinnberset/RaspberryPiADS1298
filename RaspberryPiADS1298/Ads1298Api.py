@@ -451,11 +451,9 @@ class Ads1298Api:
             return
 
         print("Configuring bias registers")
-        temp_reg_value = 0x00
-        for i in range(0, NUM_CHANNELS):
-            temp_reg_value |= 0x01 << i
-        self.spi_write_single_reg(REG_BIAS_SENSP, temp_reg_value)
-        self.spi_write_single_reg(REG_BIAS_SENSN, temp_reg_value)
+        reg_value = (2 ** NUM_CHANNELS) - 1
+        self.spi_write_single_reg(REG_BIAS_SENSP, reg_value)
+        self.spi_write_single_reg(REG_BIAS_SENSN, reg_value)
         self.spi_write_single_reg(REG_CONFIG3, 0xEC)
 
     """ PRIVATE
@@ -542,17 +540,14 @@ class Ads1298Api:
         self.set_pin(nPWRDN_PIN, state)
 
     def configure_all_channels(self, config: int):
-        tx_buf = [0] * NUM_CHANNELS
-        for i in range(0, NUM_CHANNELS):
-            tx_buf[i] = config
-        self.spi_write_multiple_reg(REG_CHnSET_BASE, tx_buf)
+        self.spi_write_multiple_reg(REG_CHnSET_BASE, [config] * NUM_CHANNELS)
 
     def set_pin(self, pin: int, state: bool):
-        if not STUB_API:
-            if state:
-                GPIO.output(pin, GPIO.HIGH)
-            else:
-                GPIO.output(pin, GPIO.LOW)
+        if STUB_API:
+            return
+
+        GPIO.output(pin, GPIO.HIGH if state else GPIO.LOW)
+
 
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #   SPI Interface
@@ -565,10 +560,11 @@ class Ads1298Api:
     """
 
     def spi_transmit_byte(self, byte):
-        if not STUB_API:
-            self.spi_lock.acquire()
+        if STUB_API:
+            return
+
+        with self.spi_lock:
             self.spi.xfer2([byte])
-            self.spi_lock.release()
 
     """ PRIVATE
     # SPI_writeSingleReg
@@ -578,10 +574,11 @@ class Ads1298Api:
     """
 
     def spi_write_single_reg(self, reg, byte):
-        if not STUB_API:
-            self.spi_lock.acquire()
+        if STUB_API:
+            return
+
+        with self.spi_lock:
             self.spi.xfer2([reg | 0x40, 0x00, byte])
-            self.spi_lock.release()
 
     """ PRIVATE
     # SPI_writeMultipleReg
@@ -593,13 +590,11 @@ class Ads1298Api:
     """
 
     def spi_write_multiple_reg(self, start_reg: int, byte_array: list[int]):
-        if not STUB_API:
-            tmp = [start_reg | 0x40, len(byte_array) - 1]
-            for i in range(0, len(byte_array)):
-                tmp.append(byte_array[i])
-            self.spi_lock.acquire()
-            self.spi.xfer2(tmp)
-            self.spi_lock.release()
+        if STUB_API:
+            return
+
+        with self.spi_lock:
+            self.spi.xfer2([start_reg | 0x40, len(byte_array) - 1] + byte_array)
 
     """ PRIVATE
     # SPI_readMultipleBytes
@@ -608,23 +603,19 @@ class Ads1298Api:
     """
 
     def spi_read_multiple_bytes(self, nb_bytes):
-        r = []
+        if STUB_API:
+            return []
 
-        if not STUB_API:
-            self.spi_lock.acquire()
-            r = self.spi.xfer2([0x00] * nb_bytes)
-            self.spi_lock.release()
-
-        return r
+        with self.spi_lock:
+            return self.spi.xfer2([0x00] * nb_bytes)
 
     def spi_read_reg(self, reg):
-        if not STUB_API:
-            self.spi_lock.acquire()
+        if STUB_API:
+            return 0x92 if reg == REG_ID else 0x00
+
+        with self.spi_lock:
             r = self.spi.xfer2([0x20 | reg, 0x00, 0x00])
-            self.spi_lock.release()
             return r[2]
-        else:
-            return 0x92  # expected REG_ID content
 
 
 def _test(use_test_signal=False):
