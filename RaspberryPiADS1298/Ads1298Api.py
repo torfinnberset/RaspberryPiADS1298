@@ -97,18 +97,13 @@ def convert_24b_data(unpacked, fmt=">i"):
     if len(unpacked) != 3:
         raise ValueError("Input should be 3 bytes long.")
 
-    literal_read = struct.pack("3B", unpacked[0], unpacked[1], unpacked[2])
+    literal_read = struct.pack("3B", *unpacked)
 
     # 3byte int in 2s compliment
-    if unpacked[0] > 127:
-        prefix = bytes(bytearray.fromhex("FF"))
-    else:
-        prefix = bytes(bytearray.fromhex("00"))
-
-    literal_read = prefix + literal_read
+    prefix = b"\xff" if unpacked[0] > 127 else b"\x00"
 
     # unpack little endian(>) signed integer(i) (makes unpacking platform independent)
-    return struct.unpack(fmt, literal_read)[0]
+    return struct.unpack(fmt, prefix + literal_read)[0]
 
 
 def convert_24b_to_float(unpacked):
