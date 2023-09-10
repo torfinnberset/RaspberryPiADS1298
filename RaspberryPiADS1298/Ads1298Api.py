@@ -201,6 +201,9 @@ class Ads1298Api:
         if not STUB_API:
             self.spi = spidev.SpiDev()
 
+    def __del__(self):
+        self.close_device()
+
     """ PUBLIC
     # openDevice
     # @brief open the ADS1298 interface and initialize the chip
@@ -243,11 +246,13 @@ class Ads1298Api:
     """
 
     def close_device(self):
-        if not STUB_API:
+        self.APIAlive = False
+
+        if STUB_API:
+            self.stubThread.join()
+        else:
             self.spi.close()
             GPIO.cleanup()
-
-        self.APIAlive = False
 
     """ PUBLIC
     # startEegStream
@@ -292,6 +297,7 @@ class Ads1298Api:
         # stop any ongoing ADS stream
         self.spi_transmit_byte(SDATAC)
         self.stream_active = False
+        self.APIAlive = False
 
     """ PUBLIC
     # registerClient
@@ -547,7 +553,6 @@ class Ads1298Api:
             return
 
         GPIO.output(pin, GPIO.HIGH if state else GPIO.LOW)
-
 
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #   SPI Interface
