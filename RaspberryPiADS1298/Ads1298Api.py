@@ -133,12 +133,6 @@ def default_callback(raw):
     print(samples)
 
 
-""" ADS1298 PINS """
-START_PIN = 22
-nRESET_PIN = 24
-nPWRDN_PIN = 25
-DRDY_PIN = 23
-
 """ ADS1298 registers map """
 REG_ID = 0x00
 REG_CONFIG1 = 0x01
@@ -192,6 +186,12 @@ class Ads1298Api:
     # True when a data stream is active
     stream_active = False
 
+    # Reconfigurable pin mapping
+    START_PIN = 22
+    nRESET_PIN = 24
+    nPWRDN_PIN = 25
+    DRDY_PIN = 23
+
     """ PUBLIC
     # Constructor
     # @brief
@@ -217,13 +217,13 @@ class Ads1298Api:
             GPIO.setmode(GPIO.BCM)
 
             # setup control pins
-            GPIO.setup(START_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(nRESET_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(nPWRDN_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(self.START_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(self.nRESET_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(self.nPWRDN_PIN, GPIO.OUT, initial=GPIO.LOW)
 
             # setup DRDY callback
-            GPIO.setup(DRDY_PIN, GPIO.IN)
-            GPIO.add_event_detect(DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
+            GPIO.setup(self.DRDY_PIN, GPIO.IN)
+            GPIO.add_event_detect(self.DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
 
         else:
             # setup fake data generator
@@ -464,7 +464,7 @@ class Ads1298Api:
     def stub_task(self):
         while self.APIAlive:
             if self.stream_active:
-                raw = np.random.bytes(3 + 3 * NUM_CHANNELS)
+                raw = b"\xC0" + np.random.bytes(2 + 3 * NUM_CHANNELS)[0:]
                 for handle in self.clientUpdateHandles:
                     handle(raw)
             sleep(1.0 / float(self.sampling_rate))
@@ -507,7 +507,7 @@ class Ads1298Api:
     """
 
     def set_start(self, state):
-        self.set_pin(START_PIN, state)
+        self.set_pin(self.START_PIN, state)
 
     """ PRIVATE
     # toggleReset
@@ -528,7 +528,7 @@ class Ads1298Api:
     """
 
     def set_nreset(self, state):
-        self.set_pin(nRESET_PIN, state)
+        self.set_pin(self.nRESET_PIN, state)
 
     """ PRIVATE
     # setnPWRDN
@@ -537,7 +537,7 @@ class Ads1298Api:
     """
 
     def set_npwrdn(self, state: bool):
-        self.set_pin(nPWRDN_PIN, state)
+        self.set_pin(self.nPWRDN_PIN, state)
 
     def configure_all_channels(self, config: int):
         self.spi_write_multiple_reg(REG_CHnSET_BASE, [config] * NUM_CHANNELS)
