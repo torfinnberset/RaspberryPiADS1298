@@ -120,11 +120,16 @@ def default_callback(raw):
     samples = np.zeros(NUM_CHANNELS)
     status_word = convert_24b_data(raw[0:3], ">I") & 0xffffff
 
+    assert status_word >> 20 == 0b1100, "Data stream out of sync"
+
+    loff_stat_p = (status_word >> 12) & 0xff
+    loff_stat_n = (status_word >> 4) & 0xff
+
     for i in range(0, NUM_CHANNELS):
         samples[i] = convert_24b_to_float(raw[(i * 3 + 3): ((i + 1) * 3 + 3)])
 
-    print(status_word)
-    print(samples)
+    print(f"LOFF P{loff_stat_p:08b} N{loff_stat_n:08b}")
+    print(f"samples: {samples}")
 
 
 """ ADS1298 registers map """
