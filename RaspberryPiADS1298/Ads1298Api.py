@@ -76,7 +76,6 @@ try:
     import RPi.GPIO as GPIO
 except ImportError:
     STUB_API = True
-    pass
 
 # exg data scaling function
 SCALE_TO_UVOLT = (5 / 12) / (2 ** 24)  # TODO: verify
@@ -186,6 +185,9 @@ class Ads1298Api:
     nRESET_PIN = 24
     nPWRDN_PIN = 25
     DRDY_PIN = 23
+
+    # This mirrors the register state on the ADS1298
+    config_registers: dict[int, int] = dict()
 
     """ PUBLIC
     # Constructor
@@ -574,6 +576,8 @@ class Ads1298Api:
     """
 
     def spi_write_single_reg(self, reg, byte):
+        self.config_registers[reg] = byte
+
         if STUB_API:
             return
 
@@ -590,6 +594,9 @@ class Ads1298Api:
     """
 
     def spi_write_multiple_reg(self, start_reg: int, byte_array: list[int]):
+        for index, addr in enumerate(range(start_reg, start_reg + len(byte_array))):
+            self.config_registers[addr] = byte_array[index]
+
         if STUB_API:
             return
 
