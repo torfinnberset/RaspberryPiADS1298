@@ -54,6 +54,7 @@
                 RESET   |     24    |    nRESET
                 PWRDN   |     25    |    nPWRDN
                 DRDY    |     23    |    DRDY
+                CE1     |     7     |    CE1
          
             The pins for the SPI port cannot be changed. CS can be flipped, if using /dev/spidev0.1 instead.
             The GPIOS can be reaffected.
@@ -117,6 +118,7 @@ DefaultCallback
 
 
 def default_callback(raw):
+    GPIO.output(CE1, GPIO.HIGH)
     samples = np.zeros(NUM_CHANNELS)
     status_word = convert_24b_data(raw[0:3], ">I") & 0xffffff
 
@@ -145,6 +147,8 @@ REG_BIAS_SENSN = 0x0E
 REG_LOFF_SENSP = 0x0F
 REG_LOFF_SENSN = 0x10
 REG_LOFF_FLIP = 0x11
+REG_WCT1 = 0x18
+REG_WCT2 = 0x19
 
 """ ADS1298 Commands """
 WAKEUP = 0x02
@@ -156,13 +160,18 @@ RDATAC = 0x10
 SDATAC = 0x11
 RDATA = 0x12
 
+""" Rconfigurable pin mapping """
+START_PIN = 22
+nRESET_PIN = 24
+nPWRDN_PIN = 25
+DRDY_PIN = 23
+CE1 = 7
+
 """
 # Ads1298Api
 # @brief Encapsulated API, provides basic functionalities
 #        to configure and control a ADS1298 connected to the SPI port
 """
-
-
 class Ads1298Api:
     # spi device
     spi = None
@@ -185,11 +194,10 @@ class Ads1298Api:
     # True when a data stream is active
     stream_active = False
 
-    # Reconfigurable pin mapping
-    START_PIN = 22
-    nRESET_PIN = 24
-    nPWRDN_PIN = 25
-    DRDY_PIN = 23
+    # Spi clk frequency [Hz]
+    spi_speed = 5000000
+    # Delay before releasing CS in [us]
+    spi_pause = 3
 
     # This mirrors the register state on the ADS1298
     config_registers: dict[int, int] = dict()
@@ -215,20 +223,21 @@ class Ads1298Api:
         if not STUB_API:
             # open and configure SPI port
             self.spi.open(0, 1)
-            self.spi.max_speed_hz = 500000
+            self.spi.max_speed_hz = self.spi_speed
             self.spi.mode = 0b01  # SPI settings are CPOL = 0 and CPHA = 1.
 
             # using BCM pin numbering scheme
             GPIO.setmode(GPIO.BCM)
 
             # setup control pins
-            GPIO.setup(self.START_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(self.nRESET_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(self.nPWRDN_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(START_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(nRESET_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(nPWRDN_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(CE1, GPIO.OUT, initial=GPIO.HIGH)
 
             # setup DRDY callback
-            GPIO.setup(self.DRDY_PIN, GPIO.IN)
-            GPIO.add_event_detect(self.DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
+            GPIO.setup(DRDY_PIN, GPIO.IN)
+            GPIO.add_event_detect(DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
 
         else:
             # setup fake data generator
@@ -362,10 +371,14 @@ class Ads1298Api:
         print("Setting up ExG mode")
 
         self.spi_write_single_reg(REG_CONFIG2, 0x00)
+        # Gain of 12
         self.configure_all_channels(0x60)
 
         self.spi_write_single_reg(REG_BIAS_SENSP, 0xFF)
         self.spi_write_single_reg(REG_BIAS_SENSN, 0x01)
+
+        #Enable WCTA, channel 2 positive
+        self.spi_write_single_reg(REG_WCT1, 0xA)
 
         self.configure_dc_leads_off(True)
         self.setup_bias_drive()
@@ -396,6 +409,8 @@ class Ads1298Api:
 
         # Write CONFIG2 D0h
         self.spi_write_single_reg(REG_CONFIG2, 0x11)
+        # Internal reference 
+        self.spi_write_single_reg(REG_CONFIG3, 0xC0)
         self.configure_dc_leads_off(False)
 
         # Write CHnSET 05h (connects test signal)
@@ -571,7 +586,7 @@ class Ads1298Api:
             return
 
         with self.spi_lock:
-            self.spi.xfer2([byte])
+            self.spi.xfer([byte], self.spi_speed, self.spi_pause)
 
     """ PRIVATE
     # SPI_writeSingleReg
@@ -587,7 +602,7 @@ class Ads1298Api:
             return
 
         with self.spi_lock:
-            self.spi.xfer2([reg | 0x40, 0x00, byte])
+            self.spi.xfer([reg | 0x40, 0x00, byte], self.spi_speed, self.spi_pause)
 
     """ PRIVATE
     # SPI_writeMultipleReg
@@ -606,7 +621,7 @@ class Ads1298Api:
             return
 
         with self.spi_lock:
-            self.spi.xfer2([start_reg | 0x40, len(byte_array) - 1] + byte_array)
+            self.spi.xfer([start_reg | 0x40, len(byte_array) - 1] + byte_array, self.spi_speed, self.spi_pause)
 
     """ PRIVATE
     # SPI_readMultipleBytes
@@ -619,14 +634,14 @@ class Ads1298Api:
             return []
 
         with self.spi_lock:
-            return self.spi.xfer2([0x00] * nb_bytes)
+            return self.spi.xfer([0x00] * nb_bytes, self.spi_speed, self.spi_pause)
 
     def spi_read_reg(self, reg):
         if STUB_API:
             return 0x92 if reg == REG_ID else 0x00
 
         with self.spi_lock:
-            r = self.spi.xfer2([0x20 | reg, 0x00, 0x00])
+            r = self.spi.xfer([0x20 | reg, 0x00, 0x00], self.spi_speed, self.spi_pause)
             return r[2]
 
 
