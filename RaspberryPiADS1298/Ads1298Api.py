@@ -54,7 +54,6 @@
                 RESET   |     24    |    nRESET
                 PWRDN   |     25    |    nPWRDN
                 DRDY    |     23    |    DRDY
-                CE1     |     7     |    CE1
          
             The pins for the SPI port cannot be changed. CS can be flipped, if using /dev/spidev0.1 instead.
             The GPIOS can be reaffected.
@@ -115,10 +114,7 @@ DefaultCallback
 @brief used as default client callback for tests 
 @data byte array of 1xN, where N is the number of channels
 """
-
-
 def default_callback(raw):
-    GPIO.output(CE1, GPIO.HIGH)
     samples = np.zeros(NUM_CHANNELS)
     status_word = convert_24b_data(raw[0:3], ">I") & 0xffffff
 
@@ -150,6 +146,7 @@ REG_LOFF_FLIP = 0x11
 REG_WCT1 = 0x18
 REG_WCT2 = 0x19
 
+
 """ ADS1298 Commands """
 WAKEUP = 0x02
 STANDBY = 0x04
@@ -159,13 +156,6 @@ STOP = 0x0A
 RDATAC = 0x10
 SDATAC = 0x11
 RDATA = 0x12
-
-""" Rconfigurable pin mapping """
-START_PIN = 22
-nRESET_PIN = 24
-nPWRDN_PIN = 25
-DRDY_PIN = 23
-CE1 = 7
 
 """
 # Ads1298Api
@@ -198,6 +188,12 @@ class Ads1298Api:
     spi_speed = 5000000
     # Delay before releasing CS in [us]
     spi_pause = 3
+    
+    """ Rconfigurable pin mapping """
+    START_PIN = 22
+    nRESET_PIN = 24
+    nPWRDN_PIN = 25
+    DRDY_PIN = 23
 
     # This mirrors the register state on the ADS1298
     config_registers: dict[int, int] = dict()
@@ -206,7 +202,6 @@ class Ads1298Api:
     # Constructor
     # @brief
     """
-
     def __init__(self):
         if not STUB_API:
             self.spi = spidev.SpiDev()
@@ -222,7 +217,7 @@ class Ads1298Api:
     def open_device(self):
         if not STUB_API:
             # open and configure SPI port
-            self.spi.open(0, 1)
+            self.spi.open(0, 0)
             self.spi.max_speed_hz = self.spi_speed
             self.spi.mode = 0b01  # SPI settings are CPOL = 0 and CPHA = 1.
 
@@ -230,14 +225,13 @@ class Ads1298Api:
             GPIO.setmode(GPIO.BCM)
 
             # setup control pins
-            GPIO.setup(START_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(nRESET_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(nPWRDN_PIN, GPIO.OUT, initial=GPIO.LOW)
-            GPIO.setup(CE1, GPIO.OUT, initial=GPIO.HIGH)
+            GPIO.setup(self.START_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(self.nRESET_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(self.nPWRDN_PIN, GPIO.OUT, initial=GPIO.LOW)
 
             # setup DRDY callback
-            GPIO.setup(DRDY_PIN, GPIO.IN)
-            GPIO.add_event_detect(DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
+            GPIO.setup(self.DRDY_PIN, GPIO.IN)
+            GPIO.add_event_detect(self.DRDY_PIN, GPIO.FALLING, callback=self.drdy_callback)
 
         else:
             # setup fake data generator
