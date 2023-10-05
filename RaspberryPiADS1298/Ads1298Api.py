@@ -114,8 +114,6 @@ DefaultCallback
 @brief used as default client callback for tests 
 @data byte array of 1xN, where N is the number of channels
 """
-
-
 def default_callback(raw):
     samples = np.zeros(NUM_CHANNELS)
     status_word = convert_24b_data(raw[0:3], ">I") & 0xffffff
@@ -145,6 +143,9 @@ REG_BIAS_SENSN = 0x0E
 REG_LOFF_SENSP = 0x0F
 REG_LOFF_SENSN = 0x10
 REG_LOFF_FLIP = 0x11
+REG_WCT1 = 0x18
+REG_WCT2 = 0x19
+
 
 """ ADS1298 Commands """
 WAKEUP = 0x02
@@ -161,8 +162,6 @@ RDATA = 0x12
 # @brief Encapsulated API, provides basic functionalities
 #        to configure and control a ADS1298 connected to the SPI port
 """
-
-
 class Ads1298Api:
     # spi device
     spi = None
@@ -185,7 +184,12 @@ class Ads1298Api:
     # True when a data stream is active
     stream_active = False
 
-    # Reconfigurable pin mapping
+    # Spi clk frequency [Hz]
+    spi_speed = 5000000
+    # Delay before releasing CS in [us]
+    spi_pause = 3
+    
+    """ Rconfigurable pin mapping """
     START_PIN = 22
     nRESET_PIN = 24
     nPWRDN_PIN = 25
@@ -198,7 +202,6 @@ class Ads1298Api:
     # Constructor
     # @brief
     """
-
     def __init__(self):
         if not STUB_API:
             self.spi = spidev.SpiDev()
@@ -214,8 +217,8 @@ class Ads1298Api:
     def open_device(self):
         if not STUB_API:
             # open and configure SPI port
-            self.spi.open(0, 1)
-            self.spi.max_speed_hz = 500000
+            self.spi.open(0, 0)
+            self.spi.max_speed_hz = self.spi_speed
             self.spi.mode = 0b01  # SPI settings are CPOL = 0 and CPHA = 1.
 
             # using BCM pin numbering scheme
@@ -362,10 +365,14 @@ class Ads1298Api:
         print("Setting up ExG mode")
 
         self.spi_write_single_reg(REG_CONFIG2, 0x00)
+        # Gain of 12
         self.configure_all_channels(0x60)
 
         self.spi_write_single_reg(REG_BIAS_SENSP, 0xFF)
         self.spi_write_single_reg(REG_BIAS_SENSN, 0x01)
+
+        #Enable WCTA, channel 2 positive
+        self.spi_write_single_reg(REG_WCT1, 0xA)
 
         self.configure_dc_leads_off(True)
         self.setup_bias_drive()
@@ -396,6 +403,8 @@ class Ads1298Api:
 
         # Write CONFIG2 D0h
         self.spi_write_single_reg(REG_CONFIG2, 0x11)
+        # Internal reference 
+        self.spi_write_single_reg(REG_CONFIG3, 0xC0)
         self.configure_dc_leads_off(False)
 
         # Write CHnSET 05h (connects test signal)
@@ -571,7 +580,7 @@ class Ads1298Api:
             return
 
         with self.spi_lock:
-            self.spi.xfer2([byte])
+            self.spi.xfer([byte], self.spi_speed, self.spi_pause)
 
     """ PRIVATE
     # SPI_writeSingleReg
@@ -587,7 +596,7 @@ class Ads1298Api:
             return
 
         with self.spi_lock:
-            self.spi.xfer2([reg | 0x40, 0x00, byte])
+            self.spi.xfer([reg | 0x40, 0x00, byte], self.spi_speed, self.spi_pause)
 
     """ PRIVATE
     # SPI_writeMultipleReg
@@ -606,7 +615,7 @@ class Ads1298Api:
             return
 
         with self.spi_lock:
-            self.spi.xfer2([start_reg | 0x40, len(byte_array) - 1] + byte_array)
+            self.spi.xfer([start_reg | 0x40, len(byte_array) - 1] + byte_array, self.spi_speed, self.spi_pause)
 
     """ PRIVATE
     # SPI_readMultipleBytes
@@ -619,14 +628,14 @@ class Ads1298Api:
             return []
 
         with self.spi_lock:
-            return self.spi.xfer2([0x00] * nb_bytes)
+            return self.spi.xfer([0x00] * nb_bytes, self.spi_speed, self.spi_pause)
 
     def spi_read_reg(self, reg):
         if STUB_API:
             return 0x92 if reg == REG_ID else 0x00
 
         with self.spi_lock:
-            r = self.spi.xfer2([0x20 | reg, 0x00, 0x00])
+            r = self.spi.xfer([0x20 | reg, 0x00, 0x00], self.spi_speed, self.spi_pause)
             return r[2]
 
 
